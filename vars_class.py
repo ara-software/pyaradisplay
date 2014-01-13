@@ -1,6 +1,10 @@
 # vars.py
 
-__doc__ = """Provide the Vars class."""
+"""Provide the Vars class.
+
+Vars is like dict, but with . style access in addition to [] style access.
+
+"""
 
 
 import numpy as np

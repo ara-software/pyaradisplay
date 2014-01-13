@@ -1,5 +1,11 @@
 # aradecode.py
 
+"""Decode binary ARA data.
+
+This code is largely borrowed from Kael Hanson.
+
+"""
+
 import gzip
 import numpy as np
 import os

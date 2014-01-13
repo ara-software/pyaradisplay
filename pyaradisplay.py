@@ -4,7 +4,11 @@
 
 from __future__ import print_function
 
-__doc__ = """Display ARA data."""
+__doc__ = """Display ARA data.
+
+This is a relatively straightforward Python-based alternative to AraDisplay.
+It is not (yet?) a feature-complete port.
+"""
 
 import datetime
 import gzip
@@ -103,6 +107,18 @@ class DataSetModel (gtk.GenericTreeModel):
     def on_iter_parent(self, child):
         return None
 
+usage = """%prog {[options]} {[data file]} 
+
+This is a relatively straightforward Python-based alternative to AraDisplay.
+It is not (yet?) a feature-complete port.
+
+If --data-dir is given, this is the directory the "Open data..." dialog will
+start in.
+
+If --pedestals-dir is given, this is the directory the "Open pedestals..."
+dialog will start in.  This is also the directory 
+
+"""
 
 class Window (object):
 
@@ -110,7 +126,8 @@ class Window (object):
 
     def __init__ (self):
 
-        usage = '%prog {[options]} {[data file]} '
+        
+        
         self.parser = parser = optparse.OptionParser (usage=usage)
 
         parser.add_option ('-d', '--data-dir', dest='data_dir',
@@ -308,18 +325,29 @@ class Window (object):
         """Load the data file."""
         self.data_dir = os.path.dirname (filename)
         # try to guess the best pedestals file
-        m = re.search ('run(\d+)', filename)
-        if m:
-            run_number = int (m.group (1))
+        if not self.cal:
+            m = re.search ('run(\d+)', filename)
             pedestal_files = np.array (sorted (glob (
-                '{0}/pedestal*dat'.format (self.opts.pedestals_dir))))
-            pedestal_runs = np.array ([int (f[-10:-4]) for f in pedestal_files])
-            older_idx = pedestal_runs < run_number
-            if older_idx.sum ():
-                pedestal_file = pedestal_files[older_idx][-1]
-            else:
-                pedestal_file = pedestal_files[0]
-            self.load_cal (pedestal_file)
+                '{0}/pedestal*dat'.format (self.cal_dir))))
+            if m and len (pedestal_files):
+                run_number = int (m.group (1))
+                pedestal_runs = np.array ([
+                    int (f[-10:-4]) for f in pedestal_files])
+                older_idx = pedestal_runs < run_number
+                if older_idx.sum ():
+                    pedestal_file = pedestal_files[older_idx][-1]
+                else:
+                    pedestal_file = pedestal_files[0]
+                self.load_cal (pedestal_file)
+        if not self.cal:
+            dialog = gtk.MessageDialog (
+                    self.window, gtk.DIALOG_MODAL,
+                    gtk.MESSAGE_WARNING, gtk.BUTTONS_OK,
+                    'Could not find a suitable pedestal file; please specify '
+                    'one manually.')
+            response = dialog.run ()
+            dialog.destroy ()
+            return
         self.dsm = DataSetModel (filename)
         self._setup_event_list ()
         self._setup_event_plots ()
