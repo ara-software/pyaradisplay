@@ -19,6 +19,7 @@ import numpy as np
 import optparse
 import os
 import re
+import scipy.signal
 import shutil
 import sys
 
@@ -68,9 +69,7 @@ class DataSetModel (gtk.GenericTreeModel):
         if 0 <= row < len (self.events):
             ev = self.events[row]
             if col == 0:
-                t = datetime.datetime.utcfromtimestamp (
-                        ev.unix + 1e-6 * ev.unix_us)
-                return str (t)
+                return str (ev.get_unix_datetime ())
             if col == 1:
                 return str (ev.event_id)
         else:
@@ -116,7 +115,10 @@ If --data-dir is given, this is the directory the "Open data..." dialog will
 start in.
 
 If --pedestals-dir is given, this is the directory the "Open pedestals..."
-dialog will start in.  This is also the directory 
+dialog will start in.  Also, if pedestals are not yet loaded when data is being
+loaded, this directory will automatically be searched for the most recent
+pedestals file prior to the run in question.  Note that this only works if the
+data file matches /run(\d+)/.
 
 """
 
@@ -124,14 +126,25 @@ class Window (object):
 
     """PyAraDisplay window."""
 
-    def __init__ (self):
+    channels = {}
+    channels[2] = [3, 1, 2, 0]
+    channels[3] = [2, 0, 3, 1]
+    channel_labels = ['Top Hpol', 'Top Vpol', 'Bottom Hpol', 'Bottom Vpol']
 
-        
+    subplot_args = dict (top=.94, bottom=.05, left=.09, right=.98,
+                hspace=0.02, wspace=0.02)
+
+    def __init__ (self, commandline=''):
         
         self.parser = parser = optparse.OptionParser (usage=usage)
 
         parser.add_option ('-d', '--data-dir', dest='data_dir',
                 metavar='DIR', help='by default load data from DIR')
+
+        parser.add_option ('-f', '--first-file', dest='first_file',
+                default=False, action='store_true',
+                help='search directories under pwd; '
+                'load the first found .dat file')
 
         parser.add_option ('-p', '--pedestals-dir', dest='pedestals_dir',
                 metavar='DIR', help='by default load pedestals from DIR')
@@ -142,7 +155,9 @@ class Window (object):
         parser.add_option ('--plot-dir', dest='plot_dir',
                 metavar='DIR', help='by default put plots in DIR')
 
-        self.opts, self.args = opts, args = parser.parse_args ()
+        argv = commandline.split (' ') if commandline else sys.argv[1:]
+
+        self.opts, self.args = opts, args = parser.parse_args (argv)
 
         self.cal_dir = opts.pedestals_dir or os.curdir
         self.data_dir = opts.data_dir or os.curdir
@@ -152,7 +167,14 @@ class Window (object):
         if opts.pedestals_file:
             self.load_cal (opts.pedestals_file)
 
-        if len (args) == 1:
+        if self.opts.first_file:
+            options = sorted (glob ('ev*.dat')) \
+                    + sorted (glob ('*/ev*.dat')) \
+                    + sorted (glob ('*/*/ev*.dat')) \
+                    + sorted (glob ('*/*/*/ev*.dat'))
+            if options:
+                self.load_data (options[0])
+        elif len (args) == 1:
             self.load_data (args[0])
 
     def _clear (self):
@@ -201,9 +223,27 @@ class Window (object):
                 self._cb_open_data), 
             ('Save plots', gtk.STOCK_SAVE, '_Save plots', '<control>s', None,
                 self._cb_save_plots), 
-            ('Quit', gtk.STOCK_QUIT, None, '<control>q', None, self._cb_quit)
+            ('Quit', gtk.STOCK_QUIT, None, '<control>q', None, self._cb_quit),
+            ('View', None, '_View', None, None, None),
             ]
         )
+        self.menu.ag.add_toggle_actions (
+            [
+            ('equally', None, 'Scale _y-axis equally',
+                '<control>e', None, self._cb_update_plots, True),
+            ('mean', None, 'Subtract _mean of waveform',
+                '<control>u', None, self._cb_update_plots, False),
+            ('fullscreen', None, '_Fullscreen',
+                'F11', None, self._cb_fullscreen, False),
+            ]
+        )
+        def get_action (name):
+            return [a for a in self.menu.ag.list_actions ()
+                if a.get_name () == name][0]
+
+        self.menu.equally_action = get_action ('equally')
+        self.menu.mean_action = get_action ('mean')
+        self.menu.fullscreen_action = get_action ('fullscreen')
         self.menu.ui = """
         <ui>
             <menubar name="MenuBar">
@@ -213,6 +253,12 @@ class Window (object):
                     <menuitem action = "Save plots" />
                     <separator />
                     <menuitem action = "Quit" />
+                </menu>
+                <menu action="View">
+                    <menuitem action = "equally" />
+                    <menuitem action = "mean" />
+                    <separator />
+                    <menuitem action = "fullscreen" />
                 </menu>
             </menubar>
         </ui>
@@ -238,13 +284,14 @@ class Window (object):
                 'Waveform',
                 'FFT (linear-y)',
                 'FFT (semilog-y)',
+                'Hilbert',
                 ]
         if not self.events.ag is None:
             self.uim.remove_action_group (self.events.ag)
             self.uim.remove_ui (self.events.merge_id)
         if self.dsm:
             self.events.vbox = gtk.VBox (False, 1)
-            self.events.vbox.set_size_request (550, 10)
+            self.events.vbox.set_size_request (650, 10)
             self.main_hpane.remove (self.main_hpane.get_child1 ())
             self.main_hpane.pack1 (self.events.vbox, resize=True)
             self.events.hbox = gtk.HBox (False, 4)
@@ -261,11 +308,15 @@ class Window (object):
             self.events.ag.add_actions ([
                 ('fft_semilogy', None, 'fft_semilogy', '<control>y', None,
                     self._cb_events_combo_switch) ], 2)
+            self.events.ag.add_actions ([
+                ('hilbert', None, 'hilbert', '<control>h', None,
+                    self._cb_events_combo_switch) ], 3)
             self.events.ui = """
             <ui>
                 <accelerator action="wf" />
                 <accelerator action="fft_linear" />
                 <accelerator action="fft_semilogy" />
+                <accelerator action="hilbert" />
             </ui>
             """
             self.uim.insert_action_group (self.events.ag, -1)
@@ -275,6 +326,7 @@ class Window (object):
             self.events.combo.set_active (0)
             self.events.combo.append_text ('FFT (linear) [Ctrl-F]')
             self.events.combo.append_text ('FFT (semilog-y) [Ctrl-Y]')
+            self.events.combo.append_text ('Hilbert [Ctrl-H]')
             self.events.combo.connect ('changed', self._cb_update_plots)
             self.events.figure = mpl.figure.Figure (
                     figsize=(3,3), dpi=50, facecolor='.85')
@@ -318,6 +370,7 @@ class Window (object):
         self.cal_dir = os.path.dirname (filename)
         with open (filename) as f:
             self.cal = aradecode.ped_cal (f)
+        print ('Loaded pedestals from "{0}".'.format (filename))
         if self.dsm:
             self._cb_update_plots (None)
 
@@ -326,7 +379,7 @@ class Window (object):
         self.data_dir = os.path.dirname (filename)
         # try to guess the best pedestals file
         if not self.cal:
-            m = re.search ('run(\d+)', filename)
+            m = re.search ('run_?(\d+)', filename)
             pedestal_files = np.array (sorted (glob (
                 '{0}/pedestal*dat'.format (self.cal_dir))))
             if m and len (pedestal_files):
@@ -349,6 +402,7 @@ class Window (object):
             dialog.destroy ()
             return
         self.dsm = DataSetModel (filename)
+        print ('Loaded data from "{0}".'.format (filename))
         self._setup_event_list ()
         self._setup_event_plots ()
         self._cb_update_plots (None)
@@ -372,26 +426,31 @@ class Window (object):
         if active == 0:
             self._plot_event_wf (fig)
         elif active == 1:
-            self._plot_event_fft (fig)
+            self._plot_event_fft (fig, log=False)
         elif active == 2:
-            self._plot_event_fft_semilogy (fig)
+            self._plot_event_fft (fig, log=True)
+        elif active == 3:
+            self._plot_event_hilbert (fig)
+
+    def _get_ws (self, ev):
+        ws = np.array ([[ev.get_waveform (dda, chan, self.cal)
+            for dda in xrange (4)]
+            for chan in self.channels[ev.station_id]])
+        if self.menu.mean_action.get_active ():
+            ws = (ws.T - ws.mean (axis=-1).T).T
+        return ws
 
     def _plot_event_wf (self, fig):
         n = self._get_selected_event_number ()
         ev = self.dsm.events[n]
+        station = ev.station_id
 
-        channels = ['Bottom Vpol', 'Top Vpol', 'Bottom Hpol', 'Top Hpol']
-        channel_positions = [3, 1, 2, 0]
         fig.clf ()
-        ws = [[ev.get_waveform (dda, chan, self.cal)
-            for dda in xrange (4)]
-            for chan in xrange (4)]
-        y_extrema = [np.max (np.abs (
-            [ws[chan][dda] for dda in xrange (4)]))
-            for chan in xrange (4)]
+        ws = self._get_ws (ev)
+        y_extrema = np.max (np.max (np.abs (ws), axis=-1), axis=1)
         for chan in xrange (4):
             for dda in xrange (4):
-                which = 4 * channel_positions[chan] + dda + 1
+                which = 4 * chan + dda + 1
                 ax = fig.add_subplot (4, 4, which)
                 w = ws[chan][dda]
                 t = np.arange (len (w)) / 3.2  # rough approximation!
@@ -400,32 +459,34 @@ class Window (object):
                         mpl.ticker.MaxNLocator (nbins=4))
                 ax.yaxis.set_major_locator (
                         mpl.ticker.MaxNLocator (nbins=6, symmetric=True))
-                if chan > 0:
+                if chan < 3:
                     ax.set_xticklabels ([])
                 if dda > 0:
                     ax.set_yticklabels ([])
                 # NOTE: this works because we do not account for cable delays
                 ax.set_xlim (0, t.max ())
-                ax.set_ylim (-y_extrema[chan], y_extrema[chan])
+                if self.menu.equally_action.get_active ():
+                    ax.set_ylim (-y_extrema[chan], y_extrema[chan])
+                else:
+                    ax.set_yticklabels ([])
+                    extremum = max (ax.get_ylim ())
+                    ax.set_ylim (-extremum, extremum)
                 ax.grid (color='.7', zorder=-10)
                 if dda == 0:
-                    ax.set_ylabel (channels[chan])
-                if channel_positions[chan] == 0:
+                    ax.set_ylabel (self.channel_labels[chan])
+                if chan == 0:
                     ax.set_title ('DDA {0}'.format (dda + 1))
-        fig.subplots_adjust (top=.94, bottom=.03, left=.07, right=.98,
-                hspace=0.02, wspace=0.02)
+        fig.subplots_adjust (**self.subplot_args)
 
-    def _plot_event_fft (self, fig):
+    def _plot_event_fft (self, fig, log):
         n = self._get_selected_event_number ()
         ev = self.dsm.events[n]
 
-        channels = ['Bottom Vpol', 'Top Vpol', 'Bottom Hpol', 'Top Hpol']
-        channel_positions = [3, 1, 2, 0]
         fig.clf ()
 
         def get_fft (w):
             basic_amplitudes = np.fft.rfft (w)
-            amplitudes = basic_amplitudes[:-1]
+            amplitudes = basic_amplitudes.T[:-1].T
             return amplitudes
 
         def get_fftfreqs (w):
@@ -435,53 +496,102 @@ class Window (object):
             frequencies = np.fft.fftfreq (n)[:n/2] / dt # Hz
             return frequencies
 
-        ws = [[ev.get_waveform (dda, chan, self.cal)
-            for dda in xrange (4)]
-            for chan in xrange (4)]
-        ffts = [[np.abs (get_fft (ws[chan][dda]))
-            for dda in xrange (4)]
-            for chan in xrange (4)]
-        fftfreqs = get_fftfreqs (ws[0][0]) / 1e6 # in MHz
-
-        y_extrema = [np.max (
-            [ffts[chan][dda][1:] for dda in xrange (4)])
-            for chan in xrange (4)]
+        ws = self._get_ws (ev)
+        ffts = np.abs (get_fft (ws)).T[1:].T
+        fftfreqs = get_fftfreqs (ws[0][0])[1:] / 1e6 # in MHz
+        ymax = np.max (np.max (ffts, axis=-1), axis=1)
+        ymin = np.min (np.min (ffts, axis=-1), axis=1)
         for chan in xrange (4):
             for dda in xrange (4):
-                which = 4 * channel_positions[chan] + dda + 1
+                which = 4 * chan + dda + 1
                 ax = fig.add_subplot (4, 4, which)
-                ax.plot (fftfreqs, ffts[chan][dda], '-', lw=.5)
+                plot = ax.semilogy if log else ax.plot
+                plot (fftfreqs, ffts[chan][dda], '-', lw=.5)
                 ax.xaxis.set_major_locator (
                         mpl.ticker.MaxNLocator (nbins=4))
                 ax.yaxis.set_major_locator (
                         mpl.ticker.MaxNLocator (nbins=4))
-                if chan > 0:
+                if chan < 3:
                     ax.set_xticklabels ([])
                 if dda > 0:
                     ax.set_yticklabels ([])
-                # NOTE: this works because we do not account for cable delays
                 ax.set_xlim (0, 1000)
-                ax.set_ylim (0, y_extrema[chan])
+                the_ymin = ymin[chan] if log else 0
+                if self.menu.equally_action.get_active ():
+                    ax.set_ylim (the_ymin, 1.05 * ymax[chan])
+                else:
+                    ax.set_ylim (the_ymin, 1.05 * ffts[chan][dda].max ())
+                    ax.set_yticklabels ([])
                 ax.grid (color='.7', zorder=-10)
                 if dda == 0:
-                    ax.set_ylabel (channels[chan])
-                if channel_positions[chan] == 0:
+                    ax.set_ylabel (self.channel_labels[chan])
+                if chan == 0:
                     ax.set_title ('DDA {0}'.format (dda + 1))
-        fig.subplots_adjust (top=.94, bottom=.04, left=.06, right=.98,
-                hspace=0.02, wspace=0.02)
+        fig.subplots_adjust (**self.subplot_args)
 
     def _plot_event_fft_semilogy (self, fig):
         self._plot_event_fft (fig)
-        for i in xrange (1, 17):
-            ax = fig.add_subplot (4, 4, i)
-            ax.set_yscale ('log')
-            ax.set_ylim (ymin=1)
+        n = self._get_selected_event_number ()
+        ev = self.dsm.events[n]
+        channels = self.channels[ev.station_id]
+        channel_positions = self.channel_positions[ev.station_id]
+        for chan in xrange (4):
+            for dda in xrange (4):
+                which = 4 * chan + dda + 1
+                ax = fig.add_subplot (4, 4, which)
+                ax.set_ylim (ymin=1)
+                ax.set_yscale ('log')
+                if chan < 3:
+                    ax.set_xticklabels ([])
+                if dda > 0:
+                    ax.set_yticklabels ([])
+
+    def _plot_event_hilbert (self, fig):
+        n = self._get_selected_event_number ()
+        ev = self.dsm.events[n]
+
+        fig.clf ()
+
+        ws = self._get_ws (ev)
+        hilberts = np.abs (scipy.signal.hilbert (ws))
+        y_extrema = np.max (np.max (hilberts.T[1:].T, axis=-1), axis=1)
+        t = np.arange (len (hilberts[0,0])) / 3.2  # rough approximation!
+        for chan in xrange (4):
+            for dda in xrange (4):
+                which = 4 * chan + dda + 1
+                ax = fig.add_subplot (4, 4, which)
+                ax.plot (t, hilberts[chan][dda], '-', lw=.5)
+                ax.xaxis.set_major_locator (
+                        mpl.ticker.MaxNLocator (nbins=4))
+                ax.yaxis.set_major_locator (
+                        mpl.ticker.MaxNLocator (nbins=4))
+                if chan < 3:
+                    ax.set_xticklabels ([])
+                if dda > 0:
+                    ax.set_yticklabels ([])
+                ax.set_xlim (0, t.max ())
+                if self.menu.equally_action.get_active ():
+                    ax.set_ylim (0, y_extrema[chan])
+                else:
+                    ax.set_yticklabels ([])
+                ax.grid (color='.7', zorder=-10)
+                if dda == 0:
+                    ax.set_ylabel (self.channel_labels[chan])
+                if chan == 0:
+                    ax.set_title ('DDA {0}'.format (dda + 1))
+        fig.subplots_adjust (**self.subplot_args)
         
 
     def _cb_delete_event (self, widget, event, *args):
         """Handle the X11 delete event."""
         self._cb_quit (widget)
         return False
+
+    def _cb_fullscreen (self, whence, *args):
+        if self.menu.fullscreen_action.get_active ():
+            self.window.fullscreen ()
+        else:
+            self.window.unfullscreen ()
 
     def _cb_events_combo_switch (self, whence, data, *args):
         self.events.combo.set_active (data)
@@ -546,16 +656,18 @@ class Window (object):
         dialog.set_current_folder (self.plots_dir)
         dialog.set_default_response (gtk.RESPONSE_OK)
         filt = gtk.FileFilter ()
+        filt.set_name ('PDF files')
+        filt.add_pattern ('*.pdf')
+        dialog.add_filter (filt)
+        filt = gtk.FileFilter ()
         filt.set_name ('Portable Network Graphics (PNG) files')
         filt.add_pattern ('*.png')
         dialog.add_filter (filt)
         filt = gtk.FileFilter ()
         filt.set_name ('Encapsulated PostScript (EPS) files')
         filt.add_pattern ('*.eps')
-        filt = gtk.FileFilter ()
-        filt.set_name ('PDF files')
-        filt.add_pattern ('*.png')
         dialog.add_filter (filt)
+        filt = gtk.FileFilter ()
         filt = gtk.FileFilter ()
         filt.set_name ('All Files')
         filt.add_pattern ('*')
@@ -567,17 +679,17 @@ class Window (object):
             filename = None
         if filename:
             self.plots_dir = dialog.get_current_folder ()
-            fig = plt.figure (figsize=(9,9))
+            fig = plt.figure (figsize=(11,9))
             self._plot_event (fig)
             fig.savefig (filename)
             plt.close (fig)
-            dialog.destroy ()
+        dialog.destroy ()
 
     def _cb_update_plots (self, widget, *args):
         """Update whatever plots need updating."""
         self.events.vbox.remove (self.events.canvas)
         self.events.figure = mpl.figure.Figure (
-                figsize=(4,4), dpi=50, facecolor='.85')
+                figsize=(3,3), dpi=50, facecolor='.85')
         self._plot_event (self.events.figure)
         self.events.canvas = mplgtk.FigureCanvasGTK (self.events.figure)
         self.events.vbox.pack_start (self.events.canvas)
@@ -588,5 +700,6 @@ class Window (object):
         gtk.main_quit ()
 
 
-window = Window ()
-window.main ()
+if __name__ == '__main__':
+    window = Window ()
+    window.main ()
