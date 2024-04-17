@@ -33,18 +33,18 @@ import aradecode
 from vars_class import Vars
 
 
-class DataSetModel (gtk.GenericTreeModel):
+class DataSetModel (Gtk.GenericTreeModel):
 
-    """DataSetModel (dataset) -> new gtk.TreeModel for an ARA dataset."""
+    """DataSetModel (dataset) -> new Gtk.TreeModel for an ARA dataset."""
 
     def __init__ (self, filename):
-        gtk.GenericTreeModel.__init__ (self)
+        Gtk.GenericTreeModel.__init__ (self)
         self.astr = aradecode.ara_stream (gzip.GzipFile (filename))
         self.events = list (self.astr)
 
-    # Section: Implementation of gtk.GenericTreeModel
+    # Section: Implementation of Gtk.GenericTreeModel
     def on_get_flags(self):
-        return gtk.TREE_MODEL_LIST_ONLY
+        return Gtk.TREE_MODEL_LIST_ONLY
 
     def on_get_n_columns(self):
         return 2
@@ -187,18 +187,18 @@ class Window (object):
         self._build_window ()
 
     def _build_window (self):
-        """Assemble the underlying gtk.Window."""
+        """Assemble the underlying Gtk.Window."""
         # the window
         if self.window is None:
-            self.window = gtk.Window (gtk.WINDOW_TOPLEVEL)
+            self.window = Gtk.Window (Gtk.WINDOW_TOPLEVEL)
             self.window.connect ('delete_event', self._cb_delete_event)
             self.window.set_size_request (1000, 500)
-            self.window.set_position(gtk.WIN_POS_CENTER)
+            self.window.set_position(Gtk.WIN_POS_CENTER)
         else:
             self.window.remove (self.menu_vbox)
         self._set_title (self.title)
         # vbox: menu, then everything else
-        self.menu_vbox = gtk.VBox (False, 2)
+        self.menu_vbox = Gtk.VBox (False, 2)
         self.window.add (self.menu_vbox)
         self._build_menu ()
         self._build_hpane ()
@@ -207,10 +207,10 @@ class Window (object):
 
     def _build_menu (self):
         """Build the menu for the window, given its current state."""
-        self.uim = gtk.UIManager ()
+        self.uim = Gtk.UIManager ()
         self.accel_group = self.uim.get_accel_group ()
         self.window.add_accel_group (self.accel_group)
-        self.menu.ag = gtk.ActionGroup ('base action group')
+        self.menu.ag = Gtk.ActionGroup ('base action group')
         self.menu.ag.add_actions (
             [
             ('File', None, '_File', None, None, None),
@@ -218,9 +218,9 @@ class Window (object):
                 self._cb_open_cal), 
             ('Open data', None, 'Open _data', '<control>o', None,
                 self._cb_open_data), 
-            ('Save plots', gtk.STOCK_SAVE, '_Save plots', '<control>s', None,
+            ('Save plots', Gtk.STOCK_SAVE, '_Save plots', '<control>s', None,
                 self._cb_save_plots), 
-            ('Quit', gtk.STOCK_QUIT, None, '<control>q', None, self._cb_quit),
+            ('Quit', Gtk.STOCK_QUIT, None, '<control>q', None, self._cb_quit),
             ('View', None, '_View', None, None, None),
             ]
         )
@@ -268,9 +268,9 @@ class Window (object):
     def _build_hpane (self):
         """Build the HPane with plots on left, trigger list on right."""
         # hpane: notebook on left, event list on right
-        self.main_hpane = gtk.HPaned ()
-        self.main_hpane.pack1 (gtk.HBox (), resize=True)
-        self.main_hpane.pack2 (gtk.HBox (), resize=True)
+        self.main_hpane = Gtk.HPaned ()
+        self.main_hpane.pack1 (Gtk.HBox (), resize=True)
+        self.main_hpane.pack2 (Gtk.HBox (), resize=True)
         self.menu_vbox.pack_start (self.main_hpane)
         self._setup_event_plots ()
         self._setup_event_list ()
@@ -287,15 +287,15 @@ class Window (object):
             self.uim.remove_action_group (self.events.ag)
             self.uim.remove_ui (self.events.merge_id)
         if self.dsm:
-            self.events.vbox = gtk.VBox (False, 1)
+            self.events.vbox = Gtk.VBox (False, 1)
             self.events.vbox.set_size_request (650, 10)
             self.main_hpane.remove (self.main_hpane.get_child1 ())
             self.main_hpane.pack1 (self.events.vbox, resize=True)
-            self.events.hbox = gtk.HBox (False, 4)
-            self.events.combo = gtk.combo_box_new_text ()
+            self.events.hbox = Gtk.HBox (False, 4)
+            self.events.combo = Gtk.combo_box_new_text ()
             self.events.hbox.pack_start (self.events.combo, expand=True)
             self.events.vbox.pack_start (self.events.hbox, expand=False)
-            self.events.ag = gtk.ActionGroup ('events action group')
+            self.events.ag = Gtk.ActionGroup ('events action group')
             self.events.ag.add_actions ([
                 ('wf', None, 'wf', '<control>m', None,
                     self._cb_events_combo_switch) ], 0)
@@ -327,40 +327,40 @@ class Window (object):
             self.events.combo.connect ('changed', self._cb_update_plots)
             self.events.figure = mpl.figure.Figure (
                     figsize=(3,3), dpi=50, facecolor='.85')
-            self.events.canvas = mplgtk.FigureCanvasGTK (self.events.figure)
+            self.events.canvas = mplGtk.FigureCanvasGTK (self.events.figure)
             self.events.vbox.pack_start (self.events.canvas)
         self.window.show_all ()
 
     def _setup_event_list (self):
         if self.dsm:
-            self.el.tv = gtk.TreeView (self.dsm)
+            self.el.tv = Gtk.TreeView (self.dsm)
             self.el.tv.connect ('cursor-changed', self._cb_update_plots)
-            self.el.sw = gtk.ScrolledWindow ()
+            self.el.sw = Gtk.ScrolledWindow ()
             self.el.sw.add_with_viewport (self.el.tv)
             self.el.sw.set_size_request (300, 10)
-            self.el.frame = gtk.Frame ('Trigger List')
+            self.el.frame = Gtk.Frame ('Trigger List')
             self.el.frame.add (self.el.sw)
             cur = self.main_hpane.get_child2 ()
             if cur:
                 self.main_hpane.remove (cur)
-            vbox = gtk.VBox (False, 4)
+            vbox = Gtk.VBox (False, 4)
             vbox.pack_start (self.el.frame, expand=True)
             self.main_hpane.pack2 (vbox, resize=True, shrink=False)
             self.el.tv.get_selection ().select_path (0)
-            cell = gtk.CellRendererText ()
-            column = gtk.TreeViewColumn (
+            cell = Gtk.CellRendererText ()
+            column = Gtk.TreeViewColumn (
                     'unix time', cell, text=0)
             self.el.tv.insert_column (column, 0)
-            cell = gtk.CellRendererText ()
-            column = gtk.TreeViewColumn (
+            cell = Gtk.CellRendererText ()
+            column = Gtk.TreeViewColumn (
                     'event id', cell, text=1)
             self.el.tv.insert_column (column, 1)
         else:
-            self.main_hpane.add2 (gtk.HBox ())
+            self.main_hpane.add2 (Gtk.HBox ())
         self.window.show_all ()
 
     def main (self):
-        gtk.main ()
+        Gtk.main ()
 
     def load_cal (self, filename):
         """Load a pedestals file."""
@@ -390,9 +390,9 @@ class Window (object):
                     pedestal_file = pedestal_files[0]
                 self.load_cal (pedestal_file)
         if not self.cal:
-            dialog = gtk.MessageDialog (
-                    self.window, gtk.DIALOG_MODAL,
-                    gtk.MESSAGE_WARNING, gtk.BUTTONS_OK,
+            dialog = Gtk.MessageDialog (
+                    self.window, Gtk.DIALOG_MODAL,
+                    Gtk.MESSAGE_WARNING, Gtk.BUTTONS_OK,
                     'Could not find a suitable pedestal file; please specify '
                     'one manually.')
             response = dialog.run ()
@@ -596,22 +596,22 @@ class Window (object):
 
     def _cb_open_cal (self, whence, *args):
         """Handle the 'Open calibration' action."""
-        dialog = gtk.FileChooserDialog ('Open calibration...',
-                None, gtk.FILE_CHOOSER_ACTION_OPEN,
-                (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                 gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+        dialog = Gtk.FileChooserDialog ('Open calibration...',
+                None, Gtk.FILE_CHOOSER_ACTION_OPEN,
+                (Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL,
+                 Gtk.STOCK_OPEN, Gtk.RESPONSE_OK))
         dialog.set_current_folder (self.cal_dir)
-        dialog.set_default_response (gtk.RESPONSE_OK)
-        filt = gtk.FileFilter ()
+        dialog.set_default_response (Gtk.RESPONSE_OK)
+        filt = Gtk.FileFilter ()
         filt.set_name ('ARA calibration dat files')
         filt.add_pattern ('*.dat')
         dialog.add_filter (filt)
-        filt = gtk.FileFilter ()
+        filt = Gtk.FileFilter ()
         filt.set_name ('All Files')
         filt.add_pattern ('*')
         dialog.add_filter (filt)
         response = dialog.run ()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.RESPONSE_OK:
             filename = dialog.get_filename ()
         else:
             filename = None
@@ -621,22 +621,22 @@ class Window (object):
 
     def _cb_open_data (self, whence, *args):
         """Handle the 'Open data' action."""
-        dialog = gtk.FileChooserDialog ('Open...',
-                None, gtk.FILE_CHOOSER_ACTION_OPEN,
-                (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                 gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+        dialog = Gtk.FileChooserDialog ('Open...',
+                None, Gtk.FILE_CHOOSER_ACTION_OPEN,
+                (Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL,
+                 Gtk.STOCK_OPEN, Gtk.RESPONSE_OK))
         dialog.set_current_folder (self.data_dir)
-        dialog.set_default_response (gtk.RESPONSE_OK)
-        filt = gtk.FileFilter ()
+        dialog.set_default_response (Gtk.RESPONSE_OK)
+        filt = Gtk.FileFilter ()
         filt.set_name ('ARA dat files')
         filt.add_pattern ('*.dat')
         dialog.add_filter (filt)
-        filt = gtk.FileFilter ()
+        filt = Gtk.FileFilter ()
         filt.set_name ('All Files')
         filt.add_pattern ('*')
         dialog.add_filter (filt)
         response = dialog.run ()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.RESPONSE_OK:
             filename = dialog.get_filename ()
         else:
             filename = None
@@ -646,31 +646,31 @@ class Window (object):
 
     def _cb_save_plots (self, whence, *args):
         """Handle the Save plots action."""
-        dialog = gtk.FileChooserDialog ('Save plots...',
-                None, gtk.FILE_CHOOSER_ACTION_SAVE,
-                (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                 gtk.STOCK_SAVE, gtk.RESPONSE_OK))
+        dialog = Gtk.FileChooserDialog ('Save plots...',
+                None, Gtk.FILE_CHOOSER_ACTION_SAVE,
+                (Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL,
+                 Gtk.STOCK_SAVE, Gtk.RESPONSE_OK))
         dialog.set_current_folder (self.plots_dir)
-        dialog.set_default_response (gtk.RESPONSE_OK)
-        filt = gtk.FileFilter ()
+        dialog.set_default_response (Gtk.RESPONSE_OK)
+        filt = Gtk.FileFilter ()
         filt.set_name ('PDF files')
         filt.add_pattern ('*.pdf')
         dialog.add_filter (filt)
-        filt = gtk.FileFilter ()
+        filt = Gtk.FileFilter ()
         filt.set_name ('Portable Network Graphics (PNG) files')
         filt.add_pattern ('*.png')
         dialog.add_filter (filt)
-        filt = gtk.FileFilter ()
+        filt = Gtk.FileFilter ()
         filt.set_name ('Encapsulated PostScript (EPS) files')
         filt.add_pattern ('*.eps')
         dialog.add_filter (filt)
-        filt = gtk.FileFilter ()
-        filt = gtk.FileFilter ()
+        filt = Gtk.FileFilter ()
+        filt = Gtk.FileFilter ()
         filt.set_name ('All Files')
         filt.add_pattern ('*')
         dialog.add_filter (filt)
         response = dialog.run ()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.RESPONSE_OK:
             filename = dialog.get_filename ()
         else:
             filename = None
@@ -688,13 +688,13 @@ class Window (object):
         self.events.figure = mpl.figure.Figure (
                 figsize=(3,3), dpi=50, facecolor='.85')
         self._plot_event (self.events.figure)
-        self.events.canvas = mplgtk.FigureCanvasGTK (self.events.figure)
+        self.events.canvas = mplGtk.FigureCanvasGTK (self.events.figure)
         self.events.vbox.pack_start (self.events.canvas)
         self.events.canvas.draw ()
         self.window.show_all ()
 
     def _cb_quit (self, whence, *args):
-        gtk.main_quit ()
+        Gtk.main_quit ()
 
 
 if __name__ == '__main__':
