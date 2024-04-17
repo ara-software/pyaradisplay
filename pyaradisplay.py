@@ -102,7 +102,7 @@ class DataSetModel (gtk.GenericTreeModel):
     def on_iter_parent(self, child):
         return None
 
-usage = """%prog {[options]} {[data file]} 
+usage = r"""%prog {[options]} {[data file]} 
 
 This is a relatively straightforward Python-based alternative to AraDisplay.
 It is not (yet?) a feature-complete port.
@@ -376,7 +376,7 @@ class Window (object):
         self.data_dir = os.path.dirname (filename)
         # try to guess the best pedestals file
         if not self.cal:
-            m = re.search ('run_?(\d+)', filename)
+            m = re.search (r'run_?(\d+)', filename)
             pedestal_files = np.array (sorted (glob (
                 '{0}/pedestal*dat'.format (self.cal_dir))))
             if m and len (pedestal_files):
