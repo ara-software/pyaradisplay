@@ -13,7 +13,7 @@ It is not (yet?) a feature-complete port.
 import datetime
 import gzip
 import matplotlib as mpl
-import matplotlib.backends.backend_gtk as mplgtk
+mpl.use('GTK3Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import optparse
@@ -25,13 +25,9 @@ import sys
 
 from glob import glob
 
-import pygtk
-pygtk.require ('2.0')
-import gtk
-if gtk.pygtk_version < (2, 4, 0):
-    print ('PyGtk 2.4.0 or later is required')
-    raise SystemExit
-import gobject
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
 
 import aradecode
 from vars_class import Vars
