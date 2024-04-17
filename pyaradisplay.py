@@ -127,6 +127,7 @@ class Window (object):
     """PyAraDisplay window."""
 
     channels = {}
+    channels[100] = [0, 1, 2, 3]
     channels[2] = [3, 1, 2, 0]
     channels[3] = [2, 0, 3, 1]
     channel_labels = ['Top Hpol', 'Top Vpol', 'Bottom Hpol', 'Bottom Vpol']
