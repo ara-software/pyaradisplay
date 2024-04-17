@@ -327,7 +327,7 @@ class Window (object):
             self.events.combo.connect ('changed', self._cb_update_plots)
             self.events.figure = mpl.figure.Figure (
                     figsize=(3,3), dpi=50, facecolor='.85')
-            self.events.canvas = mplGtk.FigureCanvasGTK (self.events.figure)
+            # self.events.canvas = mplGtk.FigureCanvasGTK (self.events.figure)
             self.events.vbox.pack_start (self.events.canvas)
         self.window.show_all ()
 
@@ -688,7 +688,7 @@ class Window (object):
         self.events.figure = mpl.figure.Figure (
                 figsize=(3,3), dpi=50, facecolor='.85')
         self._plot_event (self.events.figure)
-        self.events.canvas = mplGtk.FigureCanvasGTK (self.events.figure)
+        # self.events.canvas = mplGtk.FigureCanvasGTK (self.events.figure)
         self.events.vbox.pack_start (self.events.canvas)
         self.events.canvas.draw ()
         self.window.show_all ()
