@@ -13,6 +13,7 @@ It is not (yet?) a feature-complete port.
 import datetime
 import gzip
 import matplotlib as mpl
+from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
 mpl.use('GTK3Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -332,7 +333,7 @@ class Window (object):
             self.events.combo.connect ('changed', self._cb_update_plots)
             self.events.figure = mpl.figure.Figure (
                     figsize=(3,3), dpi=50, facecolor='.85')
-            self.events.canvas = mplGtk.FigureCanvasGTK (self.events.figure)
+            self.events.canvas = FigureCanvas (self.events.figure)
             self.events.vbox.pack_start (self.events.canvas)
         self.window.show_all ()
 
@@ -436,7 +437,7 @@ class Window (object):
 
     def _get_ws (self, ev):
         ws = np.array ([[ev.get_waveform (dda, chan, self.cal)
-            for dda in xrange (4)]
+            for dda in range (4)]
             for chan in self.channels[ev.station_id]])
         if self.menu.mean_action.get_active ():
             ws = (ws.T - ws.mean (axis=-1).T).T
@@ -450,8 +451,8 @@ class Window (object):
         fig.clf ()
         ws = self._get_ws (ev)
         y_extrema = np.max (np.max (np.abs (ws), axis=-1), axis=1)
-        for chan in xrange (4):
-            for dda in xrange (4):
+        for chan in range (4):
+            for dda in range (4):
                 which = 4 * chan + dda + 1
                 ax = fig.add_subplot (4, 4, which)
                 w = ws[chan][dda]
@@ -503,8 +504,8 @@ class Window (object):
         fftfreqs = get_fftfreqs (ws[0][0])[1:] / 1e6 # in MHz
         ymax = np.max (np.max (ffts, axis=-1), axis=1)
         ymin = np.min (np.min (ffts, axis=-1), axis=1)
-        for chan in xrange (4):
-            for dda in xrange (4):
+        for chan in range (4):
+            for dda in range (4):
                 which = 4 * chan + dda + 1
                 ax = fig.add_subplot (4, 4, which)
                 plot = ax.semilogy if log else ax.plot
@@ -537,8 +538,8 @@ class Window (object):
         ev = self.dsm.events[n]
         channels = self.channels[ev.station_id]
         channel_positions = self.channel_positions[ev.station_id]
-        for chan in xrange (4):
-            for dda in xrange (4):
+        for chan in range (4):
+            for dda in range (4):
                 which = 4 * chan + dda + 1
                 ax = fig.add_subplot (4, 4, which)
                 ax.set_ylim (ymin=1)
@@ -558,8 +559,8 @@ class Window (object):
         hilberts = np.abs (scipy.signal.hilbert (ws))
         y_extrema = np.max (np.max (hilberts.T[1:].T, axis=-1), axis=1)
         t = np.arange (len (hilberts[0,0])) / 3.2  # rough approximation!
-        for chan in xrange (4):
-            for dda in xrange (4):
+        for chan in range (4):
+            for dda in range (4):
                 which = 4 * chan + dda + 1
                 ax = fig.add_subplot (4, 4, which)
                 ax.plot (t, hilberts[chan][dda], '-', lw=.5)
@@ -693,7 +694,7 @@ class Window (object):
         self.events.figure = mpl.figure.Figure (
                 figsize=(3,3), dpi=50, facecolor='.85')
         self._plot_event (self.events.figure)
-        self.events.canvas = mplGtk.FigureCanvasGTK (self.events.figure)
+        self.events.canvas = FigureCanvas (self.events.figure)
         self.events.vbox.pack_start (self.events.canvas)
         self.events.canvas.draw ()
         self.window.show_all ()
