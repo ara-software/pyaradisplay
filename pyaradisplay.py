@@ -195,7 +195,7 @@ class Window (object):
         """Assemble the underlying Gtk.Window."""
         # the window
         if self.window is None:
-            self.window = Gtk.Window (Gtk.WINDOW_TOPLEVEL)
+            self.window = Gtk.Window (type=Gtk.WINDOW_TOPLEVEL)
             self.window.connect ('delete_event', self._cb_delete_event)
             self.window.set_size_request (1000, 500)
             self.window.set_position(Gtk.WIN_POS_CENTER)
@@ -203,7 +203,7 @@ class Window (object):
             self.window.remove (self.menu_vbox)
         self._set_title (self.title)
         # vbox: menu, then everything else
-        self.menu_vbox = Gtk.VBox (False, 2)
+        self.menu_vbox = Gtk.VBox (homogeneous=False, spacing=2)
         self.window.add (self.menu_vbox)
         self._build_menu ()
         self._build_hpane ()
@@ -215,7 +215,7 @@ class Window (object):
         self.uim = Gtk.UIManager ()
         self.accel_group = self.uim.get_accel_group ()
         self.window.add_accel_group (self.accel_group)
-        self.menu.ag = Gtk.ActionGroup ('base action group')
+        self.menu.ag = Gtk.ActionGroup (name='base action group')
         self.menu.ag.add_actions (
             [
             ('File', None, '_File', None, None, None),
@@ -338,7 +338,7 @@ class Window (object):
 
     def _setup_event_list (self):
         if self.dsm:
-            self.el.tv = Gtk.TreeView (self.dsm)
+            self.el.tv = Gtk.TreeView (model=self.dsm)
             self.el.tv.connect ('cursor-changed', self._cb_update_plots)
             self.el.sw = Gtk.ScrolledWindow ()
             self.el.sw.add_with_viewport (self.el.tv)
@@ -626,9 +626,9 @@ class Window (object):
 
     def _cb_open_data (self, whence, *args):
         """Handle the 'Open data' action."""
-        dialog = Gtk.FileChooserDialog ('Open...',
-                None, Gtk.FILE_CHOOSER_ACTION_OPEN,
-                (Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL,
+        dialog = Gtk.FileChooserDialog (title='Open...',
+                parent=None, action=Gtk.FILE_CHOOSER_ACTION_OPEN,
+                buttons=(Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL,
                  Gtk.STOCK_OPEN, Gtk.RESPONSE_OK))
         dialog.set_current_folder (self.data_dir)
         dialog.set_default_response (Gtk.RESPONSE_OK)
