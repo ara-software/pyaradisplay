@@ -32,7 +32,7 @@ class ara_stream(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         try:
             return decode_ara_blob(self.f)
         except:
