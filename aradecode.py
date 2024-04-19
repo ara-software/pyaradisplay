@@ -27,6 +27,11 @@ def decode_ara_blob(f):
 
 class ara_stream(object):
     def __init__(self, f):
+        """
+        Parameters
+        ----------
+        f : gzip _io.BufferedReader
+        """
         self.f = f
 
     def __iter__(self):
@@ -60,10 +65,10 @@ class atri_event(object):
         for i in range(self.nblk):
             self.readouts.append(atri_readout(f)) 
             binary_parts.append (self.readouts[-1].binary)
-        self.binary = ''.join (binary_parts)
+        self.binary = b''.join (binary_parts)
 
     def get_waveform(self, dda, ch, cal):
-        w = np.zeros(self.nblk / 4 * 64, 'd')
+        w = np.zeros(int(self.nblk / 4 * 64), 'd')
         ix0 = 0
         for i in range(dda, self.nblk, 4):
             w[ix0:ix0+64] = np.array(self.readouts[i].samples[ch], 'd') \
@@ -82,7 +87,7 @@ class atri_event(object):
 
 
 class atri_readout(object):
-    def __init__(self, f):
+    def __init__(self, f: bytes):
         binary_parts = []
         buf = f.read (4)
         binary_parts.append (buf)
@@ -90,10 +95,11 @@ class atri_readout(object):
         self.samples = [ ]
         for i in range(8):
             if self.mask >> i & 1 == 1:
+                # Checks if the ith bit in the bitmask is set/true
                 buf = f.read(128)
                 binary_parts.append (buf)
                 self.samples.append(unpack("<64h", buf))
-        self.binary = ''.join (binary_parts)
+        self.binary = b''.join (binary_parts)
 
 
 class ped_cal(object):
