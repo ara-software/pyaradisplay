@@ -344,7 +344,7 @@ class Window (object):
             self.el.sw = Gtk.ScrolledWindow ()
             self.el.sw.add_with_viewport (self.el.tv)
             self.el.sw.set_size_request (300, 10)
-            self.el.frame = Gtk.Frame ('Trigger List')
+            self.el.frame = Gtk.Frame ()
             self.el.frame.add (self.el.sw)
             cur = self.main_hpane.get_child2 ()
             if cur:
