@@ -1,4 +1,4 @@
-#PyAraDisplay
+# PyAraDisplay
 
 A Python raw ARA data display tool. Displays antenna waveforms given a station event `.dat`
 file and pedestal `.dat` files.
