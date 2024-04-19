@@ -15,7 +15,7 @@ On a Mac laptop, GTK3+ is most easily installed with Homebrew, using
 brew install pygobject3 gtk+3
 ```
 
-If a recent version of Python3 is not installed already, you may also need to
+If a recent version of Python3 is not installed already, you may first need to
 ```
 brew install python@3.12
 ```
